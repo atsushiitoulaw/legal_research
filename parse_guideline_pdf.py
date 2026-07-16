@@ -11,9 +11,6 @@
 
 使い方:
   python parse_guideline_pdf.py 260614_guidelines01.pdf -o tsusokuhen.jsonl
-
-事前準備:
-  pip install pymupdf
 """
 import argparse
 import json
@@ -30,11 +27,6 @@ LEVEL_THRESHOLDS = [
     (112, 140, 2),  # 節:  3-1, 3-2 ...
     (140, 999, 3),  # 項:  3-1-1, 3-1-2 ...
 ]
-
-# 下位節（3-6-2-1 など）は本文に番号が literal で入っているので、これで分割できる
-SUBSECTION_RE = re.compile(r"^(\d+(?:-\d+){3,})\s+(.+)$")
-
-MAX_CHARS = 3000  # これを超える節は下位節で分割する
 
 
 def x_to_level(x: float) -> int | None:
@@ -120,6 +112,12 @@ def extract_body_lines(doc, start_page: int) -> list[dict]:
     return lines
 
 
+# 下位節（3-6-2-1 など）は本文に番号が literal で入っているので、これで分割できる
+SUBSECTION_RE = re.compile(r"^(\d+(?:-\d+){3,})\s+(.+)$")
+
+MAX_CHARS = 3000  # これを超える節は下位節で分割する
+
+
 def split_large_section(entry: dict, lines: list[dict]) -> list[dict]:
     """大きい節を、下位節（3-6-2-1 等）の見出しで分割する"""
     section_label = f"{entry['section_no']} {entry['title']}"
@@ -174,7 +172,7 @@ def split_large_section(entry: dict, lines: list[dict]) -> list[dict]:
 
 
 def split_by_size(chunk: dict, max_chars: int = MAX_CHARS) -> list[dict]:
-    """下位節でも分割できない大きなチャンクを、行単位で安全に分割する。
+    """下位節でも分割できない大きなチャンクを、意味の区切り（句点／項目番号）で安全に分割する。
     出典（section）は同じまま、id に連番を付ける。"""
     content = chunk["content"]
     if len(content) <= max_chars:
@@ -184,9 +182,23 @@ def split_by_size(chunk: dict, max_chars: int = MAX_CHARS) -> list[dict]:
     header = lines[0]          # 節の見出し行（各パートの先頭に付け直す）
     rest = lines[1:]
 
+    # 新しいパートを始めてよい「安全な境目」の行だけを候補にする。
+    # 具体的には：
+    #   - 直前の行が句点（。）で終わっている（＝文が完結している）
+    #   - または、この行が項目番号（(1) 、一　など）で始まる（＝新しい項目の頭）
+    ITEM_START_RE = re.compile(r"^[（(]?[0-9一二三四五六七八九十]+[）)]?[\s　]")
+
+    def is_safe_break(prev_line: str, cur_line: str) -> bool:
+        if prev_line.rstrip().endswith("。"):
+            return True
+        if ITEM_START_RE.match(cur_line):
+            return True
+        return False
+
     parts, buf, size = [], [], 0
-    for ln in rest:
-        if size + len(ln) > max_chars and buf:
+    for i, ln in enumerate(rest):
+        prev_line = rest[i - 1] if i > 0 else ""
+        if size + len(ln) > max_chars and buf and is_safe_break(prev_line, ln):
             parts.append("\n".join(buf))
             buf, size = [], 0
         buf.append(ln)
@@ -194,10 +206,16 @@ def split_by_size(chunk: dict, max_chars: int = MAX_CHARS) -> list[dict]:
     if buf:
         parts.append("\n".join(buf))
 
+    # 安全な境目が見つからないまま長くなりすぎた場合の保険：
+    # 最終パートが極端に短ければ（40字未満）、前のパートに吸収する
+    if len(parts) > 1 and len(parts[-1]) < 40:
+        parts[-2] = parts[-2] + "\n" + parts[-1]
+        parts.pop()
+
     out = []
     for i, p in enumerate(parts, start=1):
         c = dict(chunk)
-        c["id"] = f"{chunk['id']}-p{i}"
+        c["id"] = f"{chunk['id']}-p{i}" if len(parts) > 1 else chunk["id"]
         c["content"] = f"{header}\n{p}"
         out.append(c)
     return out
