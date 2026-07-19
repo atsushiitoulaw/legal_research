@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
         // フロントエンド側で「/api/〜」を呼び出したら
         source: "/api/:path*",
         // バックエンド側（localhost:8000）の「/api/〜」へ自動的に繋ぎます
-        destination: "http://localhost:8000/api/:path*",
+        destination: "https://houritsu-tantai-api-asa9gfbfdtdgeqd5.japaneast-01.azurewebsites.net/api/:path*",
       },
     ];
   },
