@@ -76,19 +76,20 @@ app.add_middleware(
 class AskRequest(BaseModel):
     question: str
 
-
 class Source(BaseModel):
+    id: str
     source_document: str
     article: str
     content: str
-
+    matched_passages: list[str] = []
 
 class AskResponse(BaseModel):
     answer: str
     sources: list[Source]
 
 
-NOT_FOUND_MESSAGE = "コーパス内に該当する情報が見つかりませんでした。別の言い方で質問するか、専門家にご確認ください。"
+NOT_FOUND_MARKER = "コーパス内に該当する情報が見つかりませんでした"
+NOT_FOUND_MESSAGE = f"{NOT_FOUND_MARKER}。別の言い方で質問するか、専門家にご確認ください。"
 
 QUERY_EXPANSION_PROMPT = """あなたは個人情報保護法のリサーチを補助するアシスタントです。
 ユーザーの質問には、複数の異なる法的論点が含まれていることがあります。
@@ -181,6 +182,18 @@ def embed(text: str) -> list[float]:
     resp = with_retry(openai_client.embeddings.create, model=EMB_DEPLOYMENT, input=[text])
     return resp.data[0].embedding
 
+import re
+
+def extract_matched_passages(doc: dict) -> list[str]:
+    """検索でヒットした周辺文脈（意味のあるまとまり）を、ハイライト結果から取り出す"""
+    highlights = doc.get("@search.highlights") or {}
+    fragments = highlights.get("content", [])
+    passages = []
+    for frag in fragments:
+        clean = re.sub(r"\[\[/?H\]\]", "", frag).strip()
+        if clean:
+            passages.append(clean)
+    return sorted(set(passages), key=len, reverse=True)
 
 def search_one(query: str) -> list[dict]:
     """1つの検索クエリで、ハイブリッド検索を実行する"""
@@ -192,8 +205,14 @@ def search_one(query: str) -> list[dict]:
         vector_queries=[vector_query],
         select=["id", "source_document", "article", "section", "content"],
         top=TOP_K_PER_QUERY,
+        highlight_fields="content",
+        highlight_pre_tag="[[H]]",
+        highlight_post_tag="[[/H]]",
     )
-    return list(results)
+    docs = list(results)
+    for d in docs:
+        d["matched_passages"] = extract_matched_passages(d)
+    return docs
 
 
 def search_multi(queries: list[str]) -> list[dict]:
@@ -252,11 +271,16 @@ def ask(req: AskRequest):
         )
         answer = chat_resp.choices[0].message.content
 
-        sources = [
+        # AIが「該当なし」と判断した場合は、無関係な出典を混ぜて見せないよう、出典も空にする
+        is_not_found = NOT_FOUND_MARKER in answer
+
+        sources = [] if is_not_found else [
             Source(
+                id=d["id"],
                 source_document=d["source_document"],
                 article=d.get("article") or d.get("section") or "",
                 content=d["content"][:200],
+                matched_passages=d.get("matched_passages", []),
             )
             for d in docs
         ]
@@ -270,7 +294,29 @@ def ask(req: AskRequest):
         # それ以外（Azure接続断など、システム起因のエラー）は、
         # 原因を隠して、やわらかいメッセージだけを返す
         raise HTTPException(status_code=503, detail=SYSTEM_ERROR_MESSAGE)
-    
+
+class SourceDetail(BaseModel):
+    id: str
+    source_document: str
+    article: str
+    content: str
+
+
+@app.get("/api/source/{doc_id}", response_model=SourceDetail)
+def get_source_detail(doc_id: str):
+    try:
+        doc = search_client.get_document(key=doc_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="指定された出典が見つかりません。")
+
+    return SourceDetail(
+        id=doc["id"],
+        source_document=doc["source_document"],
+        article=doc.get("article") or doc.get("section") or "",
+        content=doc["content"],
+    )
+
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "message": "ほうりつ探検隊 API is running"}

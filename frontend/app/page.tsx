@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import SourceCard from '@/components/SourceCard';
 
 // バックエンドから返ってくるデータの形（型定義）
 interface Source {
+  id: string;
   source_document: string;
   article: string;
   content: string;
+  matched_passages: string[];
 }
 
 interface ApiResponse {
@@ -125,8 +128,8 @@ export default function Home() {
 
           <div className="border-t pt-6">
             <h3 className="font-bold text-lg mb-3">回答 / Answer</h3>
-            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded mb-6 text-sm leading-relaxed whitespace-pre-wrap">
-              {answer}
+            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded mb-6 text-sm leading-relaxed prose prose-sm max-w-none">
+              <ReactMarkdown>{answer}</ReactMarkdown>
             </div>
 
             {sources.length > 0 && (
@@ -135,8 +138,10 @@ export default function Home() {
                 {sources.map((src, index) => (
                   <SourceCard
                     key={index}
+                    id={src.id}
                     title={`${src.source_document}${src.article}`}
-                    content={src.content.length >= 200 ? `${src.content}…` : src.content}
+                    content={src.content}
+                    matchedPassages={src.matched_passages}
                   />
                 ))}
               </>
