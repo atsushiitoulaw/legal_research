@@ -69,7 +69,21 @@ export default function Home() {
     }
   };
 
+// 同じ条文（source_document + article）の出典をまとめる
+  const groupedSources = (() => {
+    const map = new Map<string, { title: string; chunks: Source[] }>();
+    for (const src of sources) {
+      const key = `${src.source_document}__${src.article}`;
+      if (!map.has(key)) {
+        map.set(key, { title: `${src.source_document}${src.article}`, chunks: [] });
+      }
+      map.get(key)!.chunks.push(src);
+    }
+    return Array.from(map.values());
+  })();
+
   return (
+
     <main className="w-full max-w-5xl mx-auto p-6 bg-white min-h-screen">
       {/* ヘッダー（共通） */}
       <header className="border-b-2 border-blue-600 pb-3 mb-6 text-left">
@@ -135,13 +149,11 @@ export default function Home() {
             {sources.length > 0 && (
               <>
                 <h3 className="font-bold text-lg mb-3">出典 / Sources</h3>
-                {sources.map((src, index) => (
+                {groupedSources.map((group, index) => (
                   <SourceCard
                     key={index}
-                    id={src.id}
-                    title={`${src.source_document}${src.article}`}
-                    content={src.content}
-                    matchedPassages={src.matched_passages}
+                    title={group.title}
+                    chunks={group.chunks}
                   />
                 ))}
               </>

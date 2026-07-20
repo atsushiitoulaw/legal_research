@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 
+interface SourceChunk {
+  id: string;
+  content: string;
+  matched_passages: string[];
+}
+
 interface SourceDetail {
   id: string;
   source_document: string;
@@ -24,8 +30,6 @@ function formatText(text: string): string {
 function renderHighlighted(text: string, passages: string[]) {
   if (!passages || passages.length === 0) return text;
 
-  // 改行整形の影響（【】や事例の前後に入る改行）を受けないよう、
-  // フレーズ側も同じ整形を通してから比較する
   const normalized = passages
     .map((p) => formatText(p).trim())
     .filter((p) => p.length > 0)
@@ -49,17 +53,8 @@ function renderHighlighted(text: string, passages: string[]) {
   );
 }
 
-export default function SourceCard({
-  id,
-  title,
-  content,
-  matchedPassages,
-}: {
-  id: string;
-  title: string;
-  content: string;
-  matchedPassages: string[];
-}) {
+// 1件のチャンク（抜粋・全文の切り替え）を表示する部品
+function ChunkView({ id, content, matched_passages }: SourceChunk) {
   const [expanded, setExpanded] = useState(false);
   const [fullContent, setFullContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -93,19 +88,17 @@ export default function SourceCard({
   };
 
   return (
-    <div className="border border-gray-300 rounded p-3 mb-3 bg-gray-50 text-left">
-      <div className="font-bold text-blue-700 text-sm mb-1">📄 {title}</div>
-
+    <div>
       {!expanded && (
         <div className="text-xs text-gray-600 leading-relaxed">
-          {renderHighlighted(content, matchedPassages)}
+          {renderHighlighted(content, matched_passages)}
           {isTruncated ? "…" : ""}
         </div>
       )}
 
       {expanded && fullContent && (
         <div className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap">
-          {renderHighlighted(formatText(fullContent), matchedPassages)}
+          {renderHighlighted(formatText(fullContent), matched_passages)}
         </div>
       )}
 
@@ -120,6 +113,34 @@ export default function SourceCard({
           {loading ? "読み込み中…" : expanded ? "折りたたむ" : "全文を読む"}
         </button>
       )}
+    </div>
+  );
+}
+
+export default function SourceCard({
+  title,
+  chunks,
+}: {
+  title: string;
+  chunks: SourceChunk[];
+}) {
+  return (
+    <div className="border border-gray-300 rounded p-3 mb-3 bg-gray-50 text-left">
+      <div className="font-bold text-blue-700 text-sm mb-1">
+        📄 {title}
+        {chunks.length > 1 && (
+          <span className="ml-2 text-xs font-normal text-gray-500">
+            （{chunks.length}箇所）
+          </span>
+        )}
+      </div>
+
+      {chunks.map((chunk, index) => (
+        <div key={chunk.id}>
+          {index > 0 && <hr className="my-2 border-gray-300" />}
+          <ChunkView {...chunk} />
+        </div>
+      ))}
     </div>
   );
 }
