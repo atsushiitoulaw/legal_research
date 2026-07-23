@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import SourceCard from '@/components/SourceCard';
+import Link from 'next/link';
+import { useAuth } from './context/AuthContext';
 
 // バックエンドから返ってくるデータの形（型定義）
 interface Source {
@@ -19,6 +21,7 @@ interface ApiResponse {
 }
 
 export default function Home() {
+  const { user, loading: authLoading, logout } = useAuth();
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState('');
@@ -46,6 +49,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ question: question }),
       });
 
@@ -86,9 +90,33 @@ export default function Home() {
 
     <main className="w-full max-w-5xl mx-auto p-6 bg-white min-h-screen">
       {/* ヘッダー（共通） */}
-      <header className="border-b-2 border-blue-600 pb-3 mb-6 text-left">
-        <h1 className="text-xl font-bold text-blue-600">ほうりつ探検隊</h1>
-        <p className="text-xs text-gray-500">個人情報保護法リサーチ支援ツール</p>
+      <header className="border-b-2 border-blue-600 pb-3 mb-6 text-left flex justify-between items-start">
+        <div>
+          <h1 className="text-xl font-bold text-blue-600">ほうりつ探検隊</h1>
+          <p className="text-xs text-gray-500">個人情報保護法リサーチ支援ツール</p>
+        </div>
+        {!authLoading && (
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            {user ? (
+              <>
+                <span>{user.email}</span>
+                <Link href="/history" className="text-blue-600 hover:underline">
+                  履歴
+                </Link>
+                <button
+                  onClick={logout}
+                  className="text-blue-600 hover:underline"
+                >
+                  ログアウト
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="text-blue-600 hover:underline">
+                ログイン
+              </Link>
+            )}
+          </div>
+        )}
       </header>
 
       {/* 状態A：入力前 */}

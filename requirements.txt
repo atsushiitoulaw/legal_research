@@ -3,3 +3,5 @@ fastapi
 azure-search-documents
 openai
 python-dotenv
+bcrypt
+azure-data-tables
