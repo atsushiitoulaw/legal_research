@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import SourceCard from '@/components/SourceCard';
 import Link from 'next/link';
@@ -22,7 +23,15 @@ interface ApiResponse {
 
 export default function Home() {
   const { user, loading: authLoading, logout } = useAuth();
+  const router = useRouter();
   const [question, setQuestion] = useState('');
+
+  // 未ログインなら、ログイン画面へ自動的に飛ばす
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
   const [loading, setLoading] = useState(false);
   const [answer, setAnswer] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
@@ -86,8 +95,11 @@ export default function Home() {
     return Array.from(map.values());
   })();
 
-  return (
+  if (authLoading || !user) {
+    return null; // ログイン確認中、またはリダイレクト待ち
+  }
 
+  return (
     <main className="w-full max-w-5xl mx-auto p-6 bg-white min-h-screen">
       {/* ヘッダー（共通） */}
       <header className="border-b-2 border-blue-600 pb-3 mb-6 text-left flex justify-between items-start">

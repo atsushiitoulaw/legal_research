@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 node_modules/
 .next/
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/
+AzuriteConfig
