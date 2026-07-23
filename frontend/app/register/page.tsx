@@ -5,12 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { register } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -18,12 +18,12 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const result = await login(email, password);
+    const result = await register(email, password);
 
     if (result.success) {
       router.push('/');
     } else {
-      setError(result.error || 'ログインに失敗しました。');
+      setError(result.error || '登録に失敗しました。');
       setLoading(false);
     }
   };
@@ -32,7 +32,7 @@ export default function LoginPage() {
     <main className="w-full max-w-sm mx-auto p-6 bg-white min-h-screen flex flex-col justify-center">
       <header className="border-b-2 border-blue-600 pb-3 mb-6 text-left">
         <h1 className="text-xl font-bold text-blue-600">ほうりつ探検隊</h1>
-        <p className="text-xs text-gray-500">ログイン</p>
+        <p className="text-xs text-gray-500">新規登録</p>
       </header>
 
       <form onSubmit={handleSubmit} className="text-left">
@@ -73,14 +73,14 @@ export default function LoginPage() {
             loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          {loading ? 'ログイン中…' : 'ログイン'}
+          {loading ? '登録中…' : '登録する'}
         </button>
       </form>
 
       <p className="text-sm text-gray-500 mt-4 text-center">
-        アカウントをお持ちでない方は{' '}
-        <Link href="/register" className="text-blue-600 hover:underline">
-          新規登録
+        すでにアカウントをお持ちの方は{' '}
+        <Link href="/login" className="text-blue-600 hover:underline">
+          ログイン
         </Link>
       </p>
     </main>
